@@ -1,211 +1,226 @@
 # src/visualize.py
 import os
+import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 
+# ===================== tiện ích =====================
 
 def ensure_dir(path: str):
     os.makedirs(path, exist_ok=True)
 
-def plot_hourly(df_hourly, out_dir: str, target_date, predicted_label: str, rain_prob_percent: float):
-    ensure_dir(out_dir)
-    t = df_hourly["time"]
+def _format_time_axis(ax, tick_every_hours=3):
+    ax.xaxis.set_major_locator(mdates.HourLocator(interval=tick_every_hours))
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%d/%m %H:%M"))
+    for lbl in ax.get_xticklabels():
+        lbl.set_rotation(45)
+    ax.grid(True, alpha=0.3)
 
-    header = f"Ngày {target_date.isoformat()} – Dự đoán: {predicted_label} – Xác suất mưa: {rain_prob_percent:.1f}%"
+# ===================== báo cáo (bảng) =====================
 
-    def save_plot(y, title, filename, ylabel=None):
-        plt.figure()
-        plt.plot(t, y)  # không set style/color để theo mặc định
-        plt.title(f"{title}\n{header}")
-        if ylabel:
-            plt.ylabel(ylabel)
-        plt.xlabel("Thời gian (VN)")
-        plt.xticks(rotation=45)
-        plt.tight_layout()
-        out_path = os.path.join(out_dir, filename)
-        plt.savefig(out_path, dpi=130)
-        plt.close()
-        return out_path
+def build_hourly_report(df_pred: pd.DataFrame) -> pd.DataFrame:
+    if not {"time","pred_label","temperature","humidity","prob_rain"}.issubset(df_pred.columns):
+        raise ValueError("df_pred phải có các cột: time, pred_label, temperature, humidity, prob_rain")
+    rep = pd.DataFrame({
+        "time": df_pred["time"],
+        "condition": df_pred["pred_label"],
+        "temperature_C": df_pred["temperature"],
+        "humidity_%": df_pred["humidity"],
+        "rain_prob_%": (df_pred["prob_rain"] * 100.0).round(1)
+    })
+    return rep
 
-    paths = []
-    paths.append(save_plot(df_hourly["temperature"], "Nhiệt độ theo giờ", f"temperature_{target_date}.png", "°C"))
-    paths.append(save_plot(df_hourly["humidity"],    "Độ ẩm theo giờ",    f"humidity_{target_date}.png", "%"))
-    paths.append(save_plot(df_hourly["cloud"],       "Mây che phủ theo giờ", f"cloud_{target_date}.png", "%"))
-    paths.append(save_plot(df_hourly["pressure"],    "Áp suất theo giờ",  f"pressure_{target_date}.png", "hPa"))
-    paths.append(save_plot(df_hourly["wind"],        "Tốc độ gió theo giờ", f"wind_{target_date}.png", "m/s"))
-    paths.append(save_plot(df_hourly["precip"],      "Lượng mưa theo giờ", f"precip_{target_date}.png", "mm"))
+def save_hourly_report_csv(df_pred: pd.DataFrame, out_csv_path: str) -> str:
+    ensure_dir(os.path.dirname(out_csv_path))
+    rep = build_hourly_report(df_pred)
+    rep.to_csv(out_csv_path, index=False)
+    return out_csv_path
 
-    return paths
+# ===================== các plot đơn lẻ =====================
 
-def plot_hourly_show(df_hourly, target_date, predicted_label: str, rain_prob_percent: float):
-    t = df_hourly["time"]
-    header = f"Ngày {target_date.isoformat()} – Dự đoán: {predicted_label} – Xác suất mưa: {rain_prob_percent:.1f}%"
-
-    def make_plot(y, title, ylabel=None):
-        fig, ax = plt.subplots()
-        ax.plot(t, y)  # không set màu/style theo yêu cầu
-        ax.set_title(f"{title}\n{header}")
-        if ylabel:
-            ax.set_ylabel(ylabel)
-        ax.set_xlabel("Thời gian (VN)")
-        ax.grid(True, alpha=0.3)
-        ax.xaxis.set_major_locator(mdates.HourLocator(interval=3))
-        ax.xaxis.set_major_formatter(mdates.DateFormatter("%d/%m %H:%M"))
-        fig.autofmt_xdate(rotation=45)
-        fig.tight_layout()
-
-    make_plot(df_hourly["temperature"], "Nhiệt độ theo giờ", "°C")
-    make_plot(df_hourly["humidity"],    "Độ ẩm theo giờ", "%")
-    make_plot(df_hourly["cloud"],       "Mây che phủ theo giờ", "%")
-    make_plot(df_hourly["pressure"],    "Áp suất theo giờ", "hPa")
-    make_plot(df_hourly["wind"],        "Tốc độ gió theo giờ", "m/s")
-    make_plot(df_hourly["precip"],      "Lượng mưa theo giờ", "mm")
-
-    # Hiển thị tất cả figure đã tạo
-    plt.show()
-def plot_hourly_dashboard(hourly_df, target_date, predicted_label: str, rain_prob_percent: float,
-                          save_path: str | None = None, show: bool = True):
-    t = hourly_df["time"]
-    header = f"Ngày {target_date.isoformat()} – Dự đoán: {predicted_label} – Xác suất mưa: {rain_prob_percent:.1f}%"
-
-    fig, axes = plt.subplots(3, 2, figsize=(12, 9), constrained_layout=True)
-    axes = axes.ravel()
-
-    series = [
-        ("Nhiệt độ (°C)", hourly_df["temperature"], "°C"),
-        ("Độ ẩm (%)",     hourly_df["humidity"],    "%"),
-        ("Mây che phủ (%)", hourly_df["cloud"],     "%"),
-        ("Áp suất (hPa)", hourly_df["pressure"],    "hPa"),
-        ("Tốc độ gió (m/s)", hourly_df["wind"],     "m/s"),
-        ("Lượng mưa (mm)",  hourly_df["precip"],    "mm"),
-    ]
-
-    for ax, (title, y, ylabel) in zip(axes, series):
-        ax.plot(t, y)  # để màu/style mặc định
-        ax.set_title(title)
-        ax.set_xlabel("Thời gian (VN)")
-        ax.set_ylabel(ylabel)
-        ax.grid(True, alpha=0.3)
-        ax.xaxis.set_major_locator(mdates.HourLocator(interval=3))
-        ax.xaxis.set_major_formatter(mdates.DateFormatter("%d/%m %H:%M"))
-        for label in ax.get_xticklabels():
-            label.set_rotation(45)
-
-    # Tiêu đề lớn cho toàn figure
-    fig.suptitle(header, fontsize=12, y=1.02)
-
-    if save_path:
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
-        fig.savefig(save_path, dpi=130)
-
-    if show:
-        plt.show()
-    else:
-        plt.close(fig)
-
-def plot_hourly_dashboard_with_probs(hourly_df, target_date, predicted_label: str, rain_prob_percent: float,
-                                     three_day_probs: list,  # list[(date, rain_prob_percent_float)]
-                                     save_path: str | None = None, show: bool = True):
-    t = hourly_df["time"]
-    header = f"Ngày hiển thị: {target_date.isoformat()} – Dự đoán: {predicted_label} – Xác suất mưa: {rain_prob_percent:.1f}%"
-
-    fig = plt.figure(figsize=(13, 10), constrained_layout=True)
-    gs = fig.add_gridspec(4, 2)  # 4 hàng x 2 cột
-
-    ax1 = fig.add_subplot(gs[0, 0]); ax2 = fig.add_subplot(gs[0, 1])
-    ax3 = fig.add_subplot(gs[1, 0]); ax4 = fig.add_subplot(gs[1, 1])
-    ax5 = fig.add_subplot(gs[2, 0]); ax6 = fig.add_subplot(gs[2, 1])
-    ax7 = fig.add_subplot(gs[3, :])  # hàng cuối: full width cho bar chart
-
-    def line(ax, y, title, ylabel):
-        ax.plot(t, y)
-        ax.set_title(title)
-        ax.set_xlabel("Thời gian (VN)")
-        ax.set_ylabel(ylabel)
-        ax.grid(True, alpha=0.3)
-        ax.xaxis.set_major_locator(mdates.HourLocator(interval=3))
-        ax.xaxis.set_major_formatter(mdates.DateFormatter("%d/%m %H:%M"))
-        for lbl in ax.get_xticklabels():
-            lbl.set_rotation(45)
-
-    line(ax1, hourly_df["temperature"], "Nhiệt độ", "°C")
-    line(ax2, hourly_df["humidity"],    "Độ ẩm",    "%")
-    line(ax3, hourly_df["cloud"],       "Mây che phủ", "%")
-    line(ax4, hourly_df["pressure"],    "Áp suất",  "hPa")
-    line(ax5, hourly_df["wind"],        "Tốc độ gió", "m/s")
-    line(ax6, hourly_df["precip"],      "Lượng mưa", "mm")
-
-    # Bar chart 3 ngày
-    labels = [d.strftime("%d/%m") for d, _ in three_day_probs]
-    vals   = [p for _, p in three_day_probs]
-    bars = ax7.bar(labels, vals)
-    ax7.set_title("Xác suất mưa (%) – Hôm nay / Ngày mai / Ngày kia")
-    ax7.set_ylabel("%")
-    ax7.set_ylim(0, 100)
-    ax7.grid(True, axis="y", alpha=0.3)
-
-    # Highlight cột của ngày đang hiển thị
-    for i, (d, v) in enumerate(three_day_probs):
-        if d == target_date:
-            bars[i].set_alpha(0.7)
-            # Không set màu cụ thể theo yêu cầu—chỉ đổi alpha
-        ax7.text(i, v + 2, f"{v:.0f}%", ha="center", va="bottom")
-
-    fig.suptitle(header, fontsize=12, y=1.02)
-
-    if save_path:
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
-        fig.savefig(save_path, dpi=130)
-
-    if show:
-        plt.show()
-    else:
-        plt.close(fig)
-def plot_hourly_rain_dashboard(df_hourly_probs, threshold: float = 0.5,
-                               title_prefix: str = "Xác suất mưa theo giờ (48h) -- Đà Nẵng",
-                               save_path: str | None = None, show: bool = True):
-    t = df_hourly_probs["time"]
-    prob_pct = (df_hourly_probs["rain_prob"] * 100.0)
-    precip = df_hourly_probs["precip_forecast"]
-
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(13, 8), constrained_layout=True)
-
-    # Bar xác suất mưa
-    bars = ax1.bar(t, prob_pct, width=0.03)  # width nhỏ để giống cột giờ
-    ax1.set_title(f"{title_prefix}")
-    ax1.set_ylabel("Xác suất mưa (%)")
-    ax1.set_ylim(0, 100)
-    ax1.grid(True, axis="y", alpha=0.3)
-    ax1.axhline(threshold*100, linestyle="--", linewidth=1)  # vạch ngưỡng
-
-    # Highlight bars > threshold
+def plot_hourly_rain_prob(df_pred: pd.DataFrame, title_prefix="Xác suất mưa theo giờ (XGBoost)",
+                          save_path: str | None = None, show: bool = False, threshold: float = 0.5):
+    if not {"time","prob_rain"}.issubset(df_pred.columns):
+        raise ValueError("Thiếu cột time/prob_rain trong df_pred")
+    t = df_pred["time"]
+    prob_pct = df_pred["prob_rain"] * 100.0
+    fig, ax = plt.subplots(figsize=(13, 4))
+    ax.set_title(title_prefix)
+    bars = ax.bar(t, prob_pct, width=0.03)
+    ax.set_ylabel("Xác suất mưa (%)")
+    ax.set_ylim(0, 100)
+    _format_time_axis(ax, tick_every_hours=3)
+    ax.axhline(threshold * 100, linestyle="--", linewidth=1)
     for b, p in zip(bars, prob_pct):
-        if p >= threshold * 100:
-            b.set_alpha(0.8)  # không set màu cụ thể, chỉ đổi alpha
-        else:
-            b.set_alpha(0.4)
-
-    ax1.xaxis.set_major_locator(mdates.HourLocator(interval=3))
-    ax1.xaxis.set_major_formatter(mdates.DateFormatter("%d/%m %H:%M"))
-    for lbl in ax1.get_xticklabels():
-        lbl.set_rotation(45)
-
-    # Line lượng mưa dự báo
-    ax2.plot(t, precip)
-    ax2.set_title("Lượng mưa dự báo (mm)")
-    ax2.set_ylabel("mm")
-    ax2.set_xlabel("Thời gian (VN)")
-    ax2.grid(True, alpha=0.3)
-    ax2.xaxis.set_major_locator(mdates.HourLocator(interval=3))
-    ax2.xaxis.set_major_formatter(mdates.DateFormatter("%d/%m %H:%M"))
-    for lbl in ax2.get_xticklabels():
-        lbl.set_rotation(45)
-
+        b.set_alpha(0.8 if p >= threshold * 100 else 0.4)
     if save_path:
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        ensure_dir(os.path.dirname(save_path))
         fig.savefig(save_path, dpi=130)
-
     if show:
         plt.show()
+    return fig  # không close, để show cùng lúc
+
+def plot_hourly_temperature(df_pred: pd.DataFrame, title="Nhiệt độ theo giờ",
+                            save_path: str | None = None, show: bool = False):
+    if not {"time","temperature"}.issubset(df_pred.columns):
+        raise ValueError("Thiếu cột time/temperature")
+    t = df_pred["time"]; y = df_pred["temperature"]
+    fig, ax = plt.subplots(figsize=(13, 3.8))
+    ax.plot(t, y)
+    ax.set_title(title)
+    ax.set_ylabel("°C")
+    ax.set_xlabel("Thời gian (VN)")
+    _format_time_axis(ax, tick_every_hours=3)
+    if save_path:
+        ensure_dir(os.path.dirname(save_path))
+        fig.savefig(save_path, dpi=130)
+    if show:
+        plt.show()
+    return fig
+
+def plot_hourly_humidity(df_pred: pd.DataFrame, title="Độ ẩm theo giờ",
+                         save_path: str | None = None, show: bool = False):
+    if not {"time","humidity"}.issubset(df_pred.columns):
+        raise ValueError("Thiếu cột time/humidity")
+    t = df_pred["time"]; y = df_pred["humidity"]
+    fig, ax = plt.subplots(figsize=(13, 3.8))
+    ax.plot(t, y)
+    ax.set_title(title)
+    ax.set_ylabel("%")
+    ax.set_xlabel("Thời gian (VN)")
+    _format_time_axis(ax, tick_every_hours=3)
+    if save_path:
+        ensure_dir(os.path.dirname(save_path))
+        fig.savefig(save_path, dpi=130)
+    if show:
+        plt.show()
+    return fig
+
+# ===================== condition bands + dashboard có headline =====================
+
+def conclude_day(df_pred: pd.DataFrame, date_hint=None):
+    if df_pred.empty:
+        return "Kết luận: Không có dữ liệu", "unknown"
+    counts = df_pred["pred_label"].value_counts(dropna=False)
+    day_label = counts.index[0]
+    conf = df_pred["pred_prob"].mean() if "pred_prob" in df_pred.columns else None
+    if day_label == "rain":
+        txt = "Kết luận: Hôm nay KHẢ NĂNG MƯA cao"
+    elif day_label == "cloudy":
+        txt = "Kết luận: Hôm nay NHIỀU MÂY"
     else:
-        plt.close(fig)
+        txt = "Kết luận: Hôm nay NẮNG"
+    if conf is not None:
+        txt += f" · độ tự tin trung bình {conf*100:.0f}%"
+    return txt, day_label
+
+def plot_hourly_dashboard_xgb_with_headline(
+    df_pred: pd.DataFrame,
+    threshold: float = 0.5,
+    save_path: str | None = None,
+    show: bool = False,
+    title_prefix: str = "Dự báo theo giờ (XGBoost — sunny/cloudy/rain)",
+    headline_text: str | None = None
+):
+    required = {"time","temperature","humidity","prob_rain","pred_label"}
+    if not required.issubset(df_pred.columns):
+        raise ValueError(f"df_pred phải có các cột: {sorted(required)}")
+    t = df_pred["time"]
+    prob_pct = df_pred["prob_rain"] * 100.0
+    temp = df_pred["temperature"]
+    hum  = df_pred["humidity"]
+    if headline_text is None:
+        headline_text, _ = conclude_day(df_pred)
+    fig, axes = plt.subplots(3, 1, figsize=(13, 9), constrained_layout=True)
+    # (1) Rain prob
+    ax1 = axes[0]
+    ax1.set_title(f"{title_prefix}\n{headline_text}")
+    bars = ax1.bar(t, prob_pct, width=0.03)
+    ax1.set_ylabel("%"); ax1.set_ylim(0, 100)
+    ax1.axhline(threshold * 100, linestyle="--", linewidth=1)
+    _format_time_axis(ax1, tick_every_hours=3)
+    for b, p in zip(bars, prob_pct):
+        b.set_alpha(0.8 if p >= threshold * 100 else 0.4)
+    # (2) Temp
+    ax2 = axes[1]; ax2.plot(t, temp)
+    ax2.set_title("Nhiệt độ"); ax2.set_ylabel("°C")
+    _format_time_axis(ax2, tick_every_hours=3)
+    # (3) Humidity
+    ax3 = axes[2]; ax3.plot(t, hum)
+    ax3.set_title("Độ ẩm"); ax3.set_ylabel("%"); ax3.set_xlabel("Thời gian (VN)")
+    _format_time_axis(ax3, tick_every_hours=3)
+    if save_path:
+        ensure_dir(os.path.dirname(save_path))
+        fig.savefig(save_path, dpi=130)
+    if show:
+        plt.show()
+    return fig
+
+def plot_hourly_condition_bands(df_pred: pd.DataFrame,
+                                save_path: str | None = None, show: bool = False,
+                                title: str = "Điều kiện theo giờ (sunny/cloudy/rain) + nhiệt độ & độ ẩm"):
+    required = {"time","pred_label","temperature","humidity"}
+    if not required.issubset(df_pred.columns):
+        raise ValueError(f"df_pred phải có các cột: {sorted(required)}")
+    t = df_pred["time"]
+    temp = df_pred["temperature"]
+    hum  = df_pred["humidity"]
+    labels = df_pred["pred_label"].astype(str)
+    fig, ax1 = plt.subplots(figsize=(14, 6))
+    ax1.set_title(title)
+    alpha_map = {"sunny": 0.15, "cloudy": 0.35, "rain": 0.6}
+    alphas = [alpha_map.get(lbl, 0.35) for lbl in labels]
+    ax1.bar(t, [1]*len(t), width=0.03, alpha=0.0)
+    for ti, a in zip(t, alphas):
+        ax1.bar(ti, 1, width=0.03, alpha=a, align="center", edgecolor="none")
+    ax1.plot(t, temp, linewidth=2)
+    ax1.set_ylabel("Nhiệt độ (°C)")
+    _format_time_axis(ax1, tick_every_hours=3)
+    ax2 = ax1.twinx()
+    ax2.plot(t, hum, linewidth=1.5, linestyle="--")
+    ax2.set_ylabel("Độ ẩm (%)")
+    if save_path:
+        ensure_dir(os.path.dirname(save_path))
+        fig.savefig(save_path, dpi=130)
+    if show:
+        plt.show()
+    return fig
+
+# ===================== HIỆN 3 FIGURE CÙNG LÚC =====================
+
+def plot_three_figures_once(df_pred: pd.DataFrame, out_dir: str, threshold: float = 0.5):
+    """
+    Tạo & LƯU & HIỂN THỊ cùng lúc 3 figure:
+      1) Dashboard 3-ô (rain%, temp, humidity) + headline kết luận.
+      2) Condition bands (nền theo nhãn) + temp & humidity.
+      3) Rain probability bar (độc lập).
+    Không set màu cụ thể, mỗi chart là một figure riêng.
+    """
+    ensure_dir(out_dir)
+    headline_text, _ = conclude_day(df_pred)
+
+    fig1 = plot_hourly_dashboard_xgb_with_headline(
+        df_pred, threshold=threshold,
+        save_path=os.path.join(out_dir, "fig_dashboard_headline.png"),
+        show=False, headline_text=headline_text
+    )
+    fig2 = plot_hourly_condition_bands(
+        df_pred,
+        save_path=os.path.join(out_dir, "fig_condition_bands.png"),
+        show=False
+    )
+    fig3 = plot_hourly_rain_prob(
+        df_pred,
+        save_path=os.path.join(out_dir, "fig_rain_prob.png"),
+        show=False, threshold=threshold
+    )
+
+    # Hiển thị CÙNG LÚC cả 3 figure đã tạo
+    plt.show()
+
+    return {
+        "dashboard_headline_png": os.path.join(out_dir, "fig_dashboard_headline.png"),
+        "condition_bands_png": os.path.join(out_dir, "fig_condition_bands.png"),
+        "rain_prob_png": os.path.join(out_dir, "fig_rain_prob.png"),
+        "headline_text": headline_text
+    }
