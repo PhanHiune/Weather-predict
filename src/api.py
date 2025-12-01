@@ -12,7 +12,7 @@ from requests.adapters import HTTPAdapter, Retry
 LAT, LON = 16.0471, 108.2068
 VN_TZ = zoneinfo.ZoneInfo("Asia/Ho_Chi_Minh")
 
-HOURLY = "temperature_2m,relativehumidity_2m,cloudcover,pressure_msl,precipitation,wind_speed_10m"
+HOURLY = "temperature_2m,relative_humidity_2m,cloudcover,pressure_msl,precipitation,wind_speed_10m"
 
 # ---------- Robust HTTP session ----------
 def _requests_session(total=5, backoff=1.0):
@@ -49,7 +49,7 @@ def _fetch_archive_hourly_chunk(start_date: str, end_date: str, timeout=90, sess
     df = pd.DataFrame({
         "time": pd.to_datetime(data["hourly"]["time"]),
         "temperature": data["hourly"]["temperature_2m"],
-        "humidity": data["hourly"]["relativehumidity_2m"],
+        "humidity": data["hourly"]["relative_humidity_2m"],
         "cloud": data["hourly"]["cloudcover"],
         "pressure": data["hourly"]["pressure_msl"],
         "precip": data["hourly"]["precipitation"],

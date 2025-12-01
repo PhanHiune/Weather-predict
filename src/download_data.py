@@ -14,7 +14,7 @@ def download_historical():
     df = pd.DataFrame({
         "time": data["hourly"]["time"],
         "temperature": data["hourly"]["temperature_2m"],
-        "humidity": data["hourly"]["relativehumidity_2m"],
+        "humidity": data["hourly"]["relative_humidity_2m"],
         "cloud": data["hourly"]["cloudcover"],
         "pressure": data["hourly"]["pressure_msl"],
         "rain": data["hourly"]["rain"],

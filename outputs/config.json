@@ -1,0 +1,16 @@
+{
+  "lat": 10.8231,
+  "lon": 106.6297,
+  "hours": 48,
+  "rain_prob_threshold": 0.5,
+  "hot_temp_c": 32.0,
+  "cloud_sunny_max": 30,
+  "features_used": [
+    "temperature",
+    "humidity",
+    "cloud",
+    "pressure",
+    "wind",
+    "hour_of_day"
+  ]
+}

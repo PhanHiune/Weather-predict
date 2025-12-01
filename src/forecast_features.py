@@ -12,7 +12,7 @@ def get_tomorrow_hourly_and_features():
     url = (
         "https://api.open-meteo.com/v1/forecast"
         f"?latitude={LAT}&longitude={LON}"
-        "&hourly=temperature_2m,relativehumidity_2m,cloudcover,pressure_msl,precipitation,wind_speed_10m"
+        "&hourly=temperature_2m,relative_humidity_2m,cloudcover,pressure_msl,precipitation,wind_speed_10m"
         "&timezone=Asia%2FHo_Chi_Minh&forecast_days=3"
     )
     r = requests.get(url, timeout=30)
@@ -24,7 +24,7 @@ def get_tomorrow_hourly_and_features():
     df = pd.DataFrame({
         "time": pd.to_datetime(data["hourly"]["time"]),
         "temperature": data["hourly"]["temperature_2m"],
-        "humidity": data["hourly"]["relativehumidity_2m"],
+        "humidity": data["hourly"]["relative_humidity_2m"],
         "cloud": data["hourly"]["cloudcover"],
         "pressure": data["hourly"]["pressure_msl"],
         "precip": data["hourly"]["precipitation"],
@@ -68,7 +68,7 @@ def _fetch_forecast_hourly_3days():
     url = (
         "https://api.open-meteo.com/v1/forecast"
         f"?latitude={LAT}&longitude={LON}"
-        "&hourly=temperature_2m,relativehumidity_2m,cloudcover,pressure_msl,precipitation,wind_speed_10m"
+        "&hourly=temperature_2m,relative_humidity_2m,cloudcover,pressure_msl,precipitation,wind_speed_10m"
         "&timezone=Asia%2FHo_Chi_Minh&forecast_days=3"
     )
     r = requests.get(url, timeout=30)
@@ -79,7 +79,7 @@ def _fetch_forecast_hourly_3days():
     df = pd.DataFrame({
         "time": pd.to_datetime(data["hourly"]["time"]),
         "temperature": data["hourly"]["temperature_2m"],
-        "humidity": data["hourly"]["relativehumidity_2m"],
+        "humidity": data["hourly"]["relative_humidity_2m"],
         "cloud": data["hourly"]["cloudcover"],
         "pressure": data["hourly"]["pressure_msl"],
         "precip": data["hourly"]["precipitation"],

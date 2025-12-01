@@ -25,15 +25,19 @@ def fetch_forecast_hourly_48h():
     r.raise_for_status()
     data = r.json()
     df = pd.DataFrame({
-        "time": pd.to_datetime(data["hourly"]["time"]),
-        "temperature": data["hourly"]["temperature_2m"],
-        "humidity": data["hourly"]["relativehumidity_2m"],
-        "cloud": data["hourly"]["cloudcover"],
-        "pressure": data["hourly"]["pressure_msl"],
-        "precip_forecast": data["hourly"]["precipitation"],
-        "wind": data["hourly"]["wind_speed_10m"],
+    "time": pd.to_datetime(data["hourly"]["time"]),
+    "temperature": data["hourly"]["temperature_2m"],
+    "humidity": data["hourly"]["relative_humidity_2m"],
+    "cloud": data["hourly"]["cloudcover"],
+    "pressure": data["hourly"]["pressure_msl"],
+    "wind": data["hourly"]["wind_speed_10m"],
     })
-    df["time"] = df["time"].dt.tz_localize(VN_TZ)
+    df["hour_of_day"] = df["time"].dt.hour
+    X = df[loaded["features"]]
+    prob = loaded["model"].predict_proba(X)[:, 1]
+    df["rain_prob"] = prob
+    df["will_rain"] = (df["rain_prob"] >= 0.5).astype(int)
+
 
     # Lấy từ giờ hiện tại đến +48h (cắt chặt)
     now = datetime.now(VN_TZ)
@@ -56,8 +60,8 @@ def predict_hourly_next_48h():
 
     df = fetch_forecast_hourly_48h()
     X = df[FEATURES_HOURLY]
-    proba = model.predict_proba(X)[:, 1]  # xác suất mưa (lớp=1)
-
-    df_out = df[["time", "precip_forecast"]].copy()
-    df_out["rain_prob"] = proba  # 0..1
-    return df_out  # mỗi dòng là 1 giờ trong 48h tới
+    proba = model.predict_proba(X)[:, 1]
+    df_out = df[["time","precip_forecast"]].copy()
+    df_out["rain_prob"] = proba
+    df_out["will_rain"] = (df_out["rain_prob"] >= threshold).astype(int)
+    return df_out
